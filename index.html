@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIMHUB</title>
+  <!-- Подключаем Plausible для tieeefdr.github.io -->
+  <script defer data-domain="tieeefdr.github.io" src="https://plausible.io/js/script.js"></script>
+  <style>
+    body{margin:0;display:grid;place-items:center;min-height:100dvh;
+         font:600 16px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+         background:#0a0c12;color:#e7ecff}
+    a{color:#8ad2ff;text-decoration:none;padding:.7rem 1rem;border:1px solid rgba(255,255,255,.15);
+      border-radius:12px;display:inline-block}
+    .box{max-width:680px;text-align:center;padding:32px;border:1px solid rgba(255,255,255,.12);
+         border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03))}
+    h1{margin:0 0 10px;font-size:22px}
+    p{margin:.4rem 0 1rem;color:#a9b6d7}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>SIMHUB · корневая страница</h1>
+    <p>Аналитика подключена. Перейти на основную страницу:</p>
+    <a href="/simhub-site/SIM/">Открыть «Активация SIM-карты»</a>
+  </div>
+  <script>
+    // Мягкий редирект через 600 мс — даём Plausible загрузиться
+    setTimeout(()=>{ location.replace('/simhub-site/SIM/'); }, 600);
+  </script>
+</body>
+</html>
