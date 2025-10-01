@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>SIMHUB · Дашборд артикулов</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{
+      --bg:#0f1115; --card:#151922; --text:#e8ecf2; --muted:#a9b0bd;
+      --accent:#7aa2ff; --grid:#222735; --good:#37d39a; --warn:#ffb020; --bad:#ff5470;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:linear-gradient(180deg,#0b0d12 0%,#0f1115 40%,#0b0d12 100%);
+      color:var(--text); font:16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(1.2) blur(8px);
+      background:rgba(10,12,16,.6); border-bottom:1px solid #1a2030;
+      padding:14px 18px;
+      display:flex; align-items:center; gap:14px; justify-content:space-between;
+    }
+    header h1{margin:0; font-size:18px; letter-spacing:.3px}
+    header .hint{color:var(--muted); font-size:13px}
+    main{padding:22px; max-width:1400px; margin:0 auto}
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+    @media (max-width:1200px){ .grid{grid-template-columns:repeat(2,1fr);} }
+    @media (max-width:760px){ .grid{grid-template-columns:1fr;} }
+
+    .card{
+      background:linear-gradient(180deg,#151922 0%, #141825 100%);
+      border:1px solid #1e2535; border-radius:var(--radius);
+      box-shadow:var(--shadow); overflow:hidden; display:flex; gap:14px; padding:14px;
+      min-height:230px;
+    }
+    .thumb{
+      width:120px; min-width:120px; height:120px; border-radius:12px; overflow:hidden;
+      border:1px solid #222a3a; background:#0a0d14; display:flex; align-items:center; justify-content:center;
+    }
+    .thumb img{width:100%; height:100%; object-fit:cover}
+    .meta{display:flex; flex-direction:column; gap:10px; flex:1;}
+    .topline{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .sku{font-weight:700; letter-spacing:.3px}
+    .nm{color:var(--muted); font-size:12px}
+    .name{color:#d7def0; font-size:14px; opacity:.95}
+    .chart-wrap{
+      position:relative; height:110px; background:linear-gradient(180deg,#0f121a 0%,#0e1118 100%);
+      border:1px solid #1b2233; border-radius:10px; padding:6px 8px;
+    }
+    canvas{width:100%; height:98px}
+    .stats{display:flex; gap:16px; flex-wrap:wrap; font-size:13px}
+    .pill{
+      padding:6px 10px; border-radius:999px; border:1px solid #223049; color:#dfe6f7; background:#0f1522;
+    }
+    .stocks{--row:#1b2233;border:1px solid var(--row); border-radius:10px; overflow:hidden; background:#0e131e;}
+    .stocks header{display:flex; justify-content:space-between; align-items:center; background:#101726;
+      padding:8px 10px; border-bottom:1px solid var(--row);}
+    .stocks table{width:100%; border-collapse:collapse; font-size:13px}
+    .stocks th,.stocks td{padding:8px 10px; border-bottom:1px dashed #1a2233}
+    .stocks tfoot td{border-top:1px solid #223049; font-weight:700}
+    .days{font-weight:700}
+    .ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .footer-note{color:var(--muted); font-size:12px}
+    .loader{opacity:.8}
+    .actions{display:flex; gap:8px; align-items:center}
+    .btn{font-size:12px;border:1px solid #25314a;background:#0f1624;color:#dfe6f7;border-radius:8px;padding:6px 10px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>SIMHUB · Дашборд артикулов</h1>
+      <div class="hint">30-дневные заказы • остатки по складам • прогноз дней до нуля</div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="manualRefresh()">Обновить сейчас</button>
+      <a class="btn" href="/logout">Выйти</a>
+    </div>
+  </header>
+
+  <main>
+    <div id="grid" class="grid" aria-live="polite"></div>
+  </main>
+
+  <script>
+  // === Список артикулов + фото/WB ID (дублируем для фронта, чтобы отрисовать сразу) ===
+  const ARTICLES = [
+    {"code":"Y299.","wb_id":"300568253","image":"https://basket-18.wbbasket.ru/vol3005/part300568/300568253/images/big/1.webp","name":"Сим карта безлимитный интернет для телефона"},
+    {"code":"Y810.","wb_id":"300618359","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618359/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"},
+    {"code":"B499.","wb_id":"300618360","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618360/images/big/1.webp","name":"Сим карта безлимитный интернет для всех устройств"},
+    {"code":"B10.","wb_id":"300618361","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618361/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"},
+    {"code":"B1050.","wb_id":"300618363","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618363/images/big/1.webp","name":"Сим карта 1000Гб"},
+    {"code":"МТС100.","wb_id":"300618366","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618366/images/big/1.webp","name":"Сим карта МТС 100Гб"},
+    {"code":"M630.","wb_id":"300618367","image":"https://basket-18.wbbasket.ru/vol3006/part300618/300618367/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"},
+    {"code":"T700.","wb_id":"300619906","image":"https://basket-18.wbbasket.ru/vol3006/part300619/300619906/images/big/1.webp","name":"Сим карта Tele2 700"},
+    {"code":"B135.","wb_id":"300825544","image":"https://basket-19.wbbasket.ru/vol3008/part300825/300825544/images/big/1.webp","name":"Сим карта безлимит 135"},
+    {"code":"Y600.","wb_id":"328123226","image":"https://basket-20.wbbasket.ru/vol3281/part328123/328123226/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"},
+    {"code":"2B499.","wb_id":"384399653","image":"https://basket-22.wbbasket.ru/vol3843/part384399/384399653/images/big/1.webp","name":"Сим карта 1000Гб для всех устройств"},
+    {"code":"M45.","wb_id":"432671801","image":"https://basket-24.wbbasket.ru/vol4326/part432671/432671801/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"},
+    {"code":"M30.","wb_id":"432671802","image":"https://basket-24.wbbasket.ru/vol4326/part432671/432671802/images/big/1.webp","name":"Сим карта безлимитный интернет с ограничением"}
+  ];
+
+  const fmt = n => (n===Infinity ? "∞" : (n||0).toLocaleString('ru-RU'));
+  function avg(list){ if(!list || !list.length) return 0; return list.reduce((a,b)=>a+b,0)/list.length }
+  function daysLeft(totalStock, dailyAvg){ if(dailyAvg <= 0) return Infinity; return totalStock / dailyAvg; }
+  function clsByDays(d){ if(d===Infinity) return 'ok'; if(d>=30) return 'ok'; if(d>=10) return 'warn'; return 'bad'; }
+
+  function cardTemplate(item){
+    const stocksTotal = (item.stocks||[]).reduce((s,x)=>s + (x.qty||0), 0);
+    const a = Math.round(avg(item.dailyOrders||[])*100)/100;
+    const d = daysLeft(stocksTotal, a);
+    const dStr = (d===Infinity) ? '∞' : Math.floor(d);
+    return `
+      <div class="card" id="card-${item.code}">
+        <div class="thumb"><img src="${item.image}" alt="${item.code}"></div>
+        <div class="meta">
+          <div class="topline">
+            <div>
+              <div class="sku">${item.code}</div>
+              <div class="nm">WB ID: ${item.wb_id}</div>
+              <div class="name">${item.name||''}</div>
+            </div>
+            <div class="stats">
+              <span class="pill">Продано 30д: <b>${fmt(item.totalQty30||0)}</b></span>
+              <span class="pill">Выручка 30д: <b>${fmt(item.revenue30||0)} ₽</b></span>
+              <span class="pill">Ср/день: <b>${a.toFixed(2)}</b></span>
+              <span class="pill days ${clsByDays(d)}">Хватит на: <b>${dStr}</b> дн.</span>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-${item.code}" width="600" height="98" class="loader"></canvas></div>
+          <div class="stocks">
+            <header><div>Остатки по складам</div><div class="footer-note">Итого: <b>${fmt(stocksTotal)}</b> шт.</div></header>
+            <table>
+              <thead><tr><th>Склад</th><th style="text-align:right">Кол-во</th></tr></thead>
+              <tbody>${(item.stocks||[]).map(r=>`<tr><td>${r.warehouse}</td><td style="text-align:right">${fmt(r.qty)}</td></tr>`).join('')}</tbody>
+              <tfoot><tr><td>Всего</td><td style="text-align:right">${fmt(stocksTotal)}</td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function drawBars(canvasId, data){
+    const c = document.getElementById(canvasId);
+    if(!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    ctx.clearRect(0,0,W,H);
+    // сетка
+    ctx.strokeStyle = '#1b2334'; ctx.lineWidth = 1;
+    for(let y=H-0.5; y>=0; y-=24){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    const max = Math.max(1, ...data);
+    const n = data.length;
+    const gap = 2;
+    const barW = Math.max(2, Math.floor((W - (n-1)*gap) / n));
+    for(let i=0;i<n;i++){
+      const v = data[i];
+      const h = Math.round((v/max) * (H-6));
+      const x = i * (barW + gap);
+      const y = H - h;
+      const g = ctx.createLinearGradient(0,y,0,H);
+      g.addColorStop(0,'#84a7ff'); g.addColorStop(1,'#5c7fe8');
+      ctx.fillStyle = g;
+      ctx.fillRect(x,y,barW,h);
+    }
+  }
+
+  async function loadAndRender(){
+    const grid = document.getElementById('grid');
+    grid.innerHTML = ARTICLES.map(x => cardTemplate({...x, dailyOrders:Array(30).fill(0), totalQty30:0, revenue30:0, stocks:[]})).join('');
+    const codes = ARTICLES.map(x=>encodeURIComponent(x.code)).join(',');
+    try{
+      const r = await fetch(`/summary?codes=${codes}`);
+      if(!r.ok){ throw new Error('HTTP '+r.status); }
+      const data = await r.json();
+      const byCode = Object.fromEntries(data.map(x=>[x.code,x]));
+      ARTICLES.forEach(a=>{
+        const merged = Object.assign({}, a, byCode[a.code]||{});
+        const card = document.getElementById(`card-${a.code}`);
+        if(card){ card.outerHTML = cardTemplate(merged); }
+        drawBars(`chart-${a.code}`, merged.dailyOrders||[]);
+      });
+    }catch(e){
+      console.warn('Не удалось получить /summary', e);
+      ARTICLES.forEach(a=>drawBars(`chart-${a.code}`, Array(30).fill(0)));
+    }
+  }
+
+  function manualRefresh(){ loadAndRender(); }
+  loadAndRender();
+  </script>
+</body>
+</html>
